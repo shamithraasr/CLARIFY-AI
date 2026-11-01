@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results | CLARIFY AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="results-page">
+
+    <nav class="navbar">
+        <a href="/" class="logo">🔍 CLARIFY AI</a>
+
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard">New Analysis</a>
+        </div>
+    </nav>
+
+    <main class="results-container">
+
+        <section class="results-heading">
+            <span class="section-tag">DOCUMENT INTELLIGENCE REPORT</span>
+            <h1>Your Document <span>Analysis</span></h1>
+            <p>Understand the important conditions before you make a decision.</p>
+        </section>
+
+        <section class="result-card summary-card">
+            <div class="result-card-heading">
+                <h2>📄 Document Summary</h2>
+            </div>
+            <p id="documentType">Analysed Document</p>
+            <p id="documentSummary">Your document summary will appear here.</p>
+        </section>
+
+        <section class="risk-overview-section">
+            <h2>⚠️ Risk Overview</h2>
+
+            <div class="risk-overview-grid">
+                <div class="risk-box high-risk">
+                    <span>HIGH RISK</span>
+                    <h2 id="highRiskCount">0</h2>
+                </div>
+
+                <div class="risk-box medium-risk">
+                    <span>MEDIUM RISK</span>
+                    <h2 id="mediumRiskCount">0</h2>
+                </div>
+
+                <div class="risk-box low-risk">
+                    <span>LOW RISK</span>
+                    <h2 id="lowRiskCount">0</h2>
+                </div>
+            </div>
+
+            <p class="overall-risk">
+                Overall Risk:
+                <strong id="overallRisk">Not Available</strong>
+            </p>
+        </section>
+
+        <section class="result-card">
+            <h2>🔍 Important Conditions & Hidden Risks</h2>
+            <div id="conditionsList" class="result-list">
+                <p>Conditions will appear here.</p>
+            </div>
+        </section>
+
+        <section class="result-card">
+            <h2>💰 Financial Obligations</h2>
+            <div id="financialList" class="result-list">
+                <p>Financial details will appear here.</p>
+            </div>
+        </section>
+
+        <section class="result-card">
+            <h2>📅 Important Deadlines</h2>
+            <div id="deadlinesList" class="result-list">
+                <p>Deadlines will appear here.</p>
+            </div>
+        </section>
+
+        <section class="result-card">
+            <h2>🚨 Penalties & Consequences</h2>
+            <div id="penaltiesList" class="result-list">
+                <p>Penalty details will appear here.</p>
+            </div>
+        </section>
+
+        <section class="result-card">
+            <h2>❓ Missing Information</h2>
+            <div id="missingList" class="result-list">
+                <p>Missing information will appear here.</p>
+            </div>
+        </section>
+
+        <section class="result-card tamil-card">
+            <h2>🌐 Tamil Explanation</h2>
+            <p id="tamilSummary">Tamil explanation will appear here.</p>
+        </section>
+
+        <section class="result-card">
+            <h2>✅ Your Action Checklist</h2>
+            <div id="checklistList" class="result-list">
+                <p>Your checklist will appear here.</p>
+            </div>
+        </section>
+
+        <section class="disclaimer-card">
+            <h3>Important Disclaimer</h3>
+            <p id="disclaimer">
+                CLARIFY AI provides document understanding assistance.
+                It does not replace professional legal advice.
+            </p>
+        </section>
+
+        <div class="results-actions">
+            <a href="/dashboard" class="primary-button">Analyse Another Document →</a>
+            <a href="/" class="secondary-button">Back to Home</a>
+        </div>
+
+    </main>
+
+    <script src="/js/result.js"></script>
+
+</body>
+</html>

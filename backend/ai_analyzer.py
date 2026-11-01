@@ -3,29 +3,37 @@ import os
 import json
 import re
 import time
-import urllib.request
-import urllib.error
 
 from dotenv import load_dotenv
+from groq import Groq
 
 
 # ==================================================
-# CONFIGURATION - LOAD EXISTING .ENV
+# CONFIGURATION - GROQ AI
 # ==================================================
 
-load_dotenv()
-
-OLLAMA_URL = os.getenv(
-    "OLLAMA_URL",
-    "http://localhost:11434/api/chat"
+load_dotenv(
+    dotenv_path=os.path.join(
+        os.path.dirname(__file__),
+        ".env"
+    )
 )
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 MODEL_NAME = os.getenv(
-    "OLLAMA_MODEL",
-    "llama3.2:1b"
+    "GROQ_MODEL",
+    "llama-3.3-70b-versatile"
 )
 
-TIMEOUT = 240
+if not GROQ_API_KEY:
+    raise RuntimeError(
+        "GROQ_API_KEY is missing. Check backend/.env"
+    )
+
+client = Groq(api_key=GROQ_API_KEY)
+
+TIMEOUT = 120
 CHUNK_SIZE = 3500
 
 
@@ -625,7 +633,7 @@ def split_text(text):
 
 
 # ==================================================
-# AI ANALYSIS USING LOCAL OLLAMA ONLY
+# AI ANALYSIS USING GROQ
 # ==================================================
 
 def analyze_chunk(chunk, language):
@@ -652,116 +660,57 @@ RULES:
 - Leave irrelevant categories empty.
 - Leave tamil_summary empty.
 - Use strings in arrays, never nested objects.
-- Return only JSON matching the supplied schema.
+- Return only valid JSON matching this structure:
+
+{json.dumps(RESPONSE_SCHEMA, ensure_ascii=False)}
 
 DOCUMENT TEXT:
 {chunk}
 """
 
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "stream": False,
-        "format": RESPONSE_SCHEMA,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0,
-            "num_ctx": 2048,
-            "num_predict": 900
-        }
-    }
-
-    request = urllib.request.Request(
-        OLLAMA_URL,
-        data=json.dumps(
-            payload,
-            ensure_ascii=False
-        ).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-
     started = time.perf_counter()
 
     try:
 
-        with urllib.request.urlopen(
-            request,
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0,
+            max_completion_tokens=4000,
+            response_format={"type": "json_object"},
             timeout=TIMEOUT
-        ) as response:
+        )
 
-            result = json.loads(
-                response.read().decode("utf-8")
-            )
+        content = response.choices[0].message.content
 
-        content = result.get(
-            "message", {}
-        ).get("content", "")
-
-        print("\n--- OLLAMA PERFORMANCE ---")
+        print("\n--- GROQ PERFORMANCE ---")
         print(
             f"Request time: "
             f"{time.perf_counter() - started:.2f} seconds"
         )
-        print("Done reason:", result.get("done_reason"))
-        print("Generated tokens:", result.get("eval_count", 0))
-
-        if result.get("eval_duration"):
-
-            generation_seconds = (
-                result["eval_duration"] / 1_000_000_000
-            )
-
-            print(
-                f"Generation time: {generation_seconds:.2f} seconds"
-            )
-
         print("--- END PERFORMANCE ---\n")
 
-        if not content.strip():
-            raise RuntimeError("Ollama returned an empty response.")
+        if not content or not content.strip():
+            raise RuntimeError("Groq returned an empty response.")
 
-        try:
-            analysis = json.loads(content)
-
-        except json.JSONDecodeError as error:
-
-            print("\n--- INVALID OLLAMA RESPONSE ---")
-            print(content[:2000])
-            print("Done reason:", result.get("done_reason"))
-            print("--- END RESPONSE ---\n")
-
-            raise RuntimeError(
-                "Ollama returned incomplete JSON. "
-                "Try a shorter document."
-            ) from error
+        analysis = json.loads(content)
 
         if not isinstance(analysis, dict):
             raise RuntimeError("Invalid AI response structure.")
 
         return analysis
 
-    except urllib.error.HTTPError as error:
+    except Exception as error:
+
+        print("GROQ ERROR:", str(error))
 
         raise RuntimeError(
-            f"Ollama HTTP error: {error.code}"
-        ) from error
-
-    except urllib.error.URLError as error:
-
-        raise RuntimeError(
-            "Cannot connect to Ollama. Check that Ollama is running."
-        ) from error
-
-    except TimeoutError as error:
-
-        raise RuntimeError(
-            "AI analysis timed out. Please try again."
+            f"Groq AI analysis failed: {str(error)}"
         ) from error
 
 
@@ -985,7 +934,7 @@ def analyze_document(document_text, language="English"):
 
         return analysis
 
-    # Resume, subscription and other documents: Ollama.
+    # Resume, subscription and other documents: Groq.
     details = extract_document_details(document_text)
     chunks = split_text(document_text)
 
