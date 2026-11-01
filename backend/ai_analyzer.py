@@ -1,17 +1,29 @@
 ﻿
+import os
 import json
 import re
 import time
 import urllib.request
 import urllib.error
 
+from dotenv import load_dotenv
+
 
 # ==================================================
-# CONFIGURATION
+# CONFIGURATION - LOAD EXISTING .ENV
 # ==================================================
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "llama3.2:1b"
+load_dotenv()
+
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://localhost:11434/api/chat"
+)
+
+MODEL_NAME = os.getenv(
+    "OLLAMA_MODEL",
+    "llama3.2:1b"
+)
 
 TIMEOUT = 240
 CHUNK_SIZE = 3500
@@ -37,10 +49,7 @@ INFORMATION_FIELDS = [
 def string_list(max_items=3):
     return {
         "type": "array",
-        "items": {
-            "type": "string",
-            "maxLength": 120
-        },
+        "items": {"type": "string"},
         "maxItems": max_items
     }
 
@@ -291,11 +300,19 @@ def classify_document(text):
     ):
         return "internship" if "intern" in lower else "employment"
 
-    if (
-        "subscription policy" in lower
-        or "subscription plan" in lower
-        or "cancellation policy" in lower
-    ):
+    subscription_words = [
+        "subscription policy",
+        "subscription plan",
+        "cancellation policy",
+        "auto renewal",
+        "billing period"
+    ]
+
+    subscription_count = sum(
+        word in lower for word in subscription_words
+    )
+
+    if subscription_count >= 2:
         return "subscription"
 
     if "resume" in lower or "curriculum vitae" in lower:
@@ -432,30 +449,20 @@ def analyze_offer_without_ai(text, document_kind):
     joining_date = get_label_value(text, "Joining Date")
     stipend = get_label_value(text, "Monthly Stipend")
     salary = get_label_value(text, "Salary")
-    working_days = get_label_value(text, "Working Days")
-    working_hours = get_label_value(text, "Working Hours")
-    work_mode = get_label_value(text, "Work Mode")
     hr_email = get_label_value(text, "HR Email")
     website = get_label_value(text, "Company Website")
 
-    # Extract details from common unlabelled wording too.
     if not position:
+
         match = re.search(
             r"position as\s+(.+?)\s+at\s+(.+?)[.,\n]",
             text,
             re.IGNORECASE
         )
+
         if match:
             position = match.group(1).strip()
             company = company or match.group(2).strip()
-
-    if not company:
-        match = re.search(
-            r"at\s+([A-Z][A-Za-z0-9 &.-]+)",
-            text
-        )
-        if match:
-            company = match.group(1).strip()
 
     if recipient:
         details["names"].append(recipient)
@@ -467,12 +474,11 @@ def analyze_offer_without_ai(text, document_kind):
         details["experience"].append(position)
 
     if hr_email:
-        details["emails"] = list(set(details["emails"] + [hr_email]))
+        add_unique(details["emails"], [hr_email])
 
     if website:
-        details["websites"] = list(set(details["websites"] + [website]))
+        add_unique(details["websites"], [website])
 
-    # Find responsibilities and conditions.
     responsibilities = matching_sentences(
         text,
         [
@@ -496,7 +502,6 @@ def analyze_offer_without_ai(text, document_kind):
         maximum=4
     )
 
-    # Financial details.
     financial = []
 
     if stipend:
@@ -504,11 +509,6 @@ def analyze_offer_without_ai(text, document_kind):
     elif salary:
         financial.append("Salary: " + salary)
 
-    if stipend or salary:
-        amounts = extract_document_details(text)["amounts"]
-        add_unique(details["amounts"], amounts)
-
-    # Summary.
     summary = []
 
     if position:
@@ -526,12 +526,10 @@ def analyze_offer_without_ai(text, document_kind):
     if joining_date:
         summary.append("Joining date: " + joining_date)
 
-    # Important points.
     important = []
     add_unique(important, responsibilities)
     add_unique(important, conditions)
 
-    # Deadlines.
     deadlines = []
 
     if joining_date:
@@ -542,7 +540,11 @@ def analyze_offer_without_ai(text, document_kind):
 
     notice = matching_sentences(
         text,
-        ["days' written notice", "days written notice", "notice before ending"]
+        [
+            "days' written notice",
+            "days written notice",
+            "notice before ending"
+        ]
     )
 
     add_unique(deadlines, notice)
@@ -561,10 +563,13 @@ def analyze_offer_without_ai(text, document_kind):
     result["checklist"] = responsibilities[:2]
 
     if document_kind == "internship":
+
         result["tamil_summary"] = [
             "இந்த இன்டர்ன்ஷிப் வாய்ப்பு கடிதத்தில் நிறுவனத்தின் பெயர், பணிப்பதவி, உதவித்தொகை, பணிக்காலம் மற்றும் முக்கிய நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
         ]
+
     else:
+
         result["tamil_summary"] = [
             "இந்த வேலைவாய்ப்பு கடிதத்தில் நிறுவனத்தின் பெயர், பணிப்பதவி, சம்பளம் மற்றும் வேலை நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
         ]
@@ -573,8 +578,6 @@ def analyze_offer_without_ai(text, document_kind):
         "sections_analyzed": 1,
         "total_characters": len(text)
     }
-
-    print("CLARIFY AI: Offer letter extraction completed.")
 
     return result
 
@@ -622,7 +625,7 @@ def split_text(text):
 
 
 # ==================================================
-# AI ANALYSIS FOR OTHER DOCUMENTS
+# AI ANALYSIS USING LOCAL OLLAMA ONLY
 # ==================================================
 
 def analyze_chunk(chunk, language):
@@ -635,16 +638,17 @@ Extract facts from the document. Never invent information.
 For resumes extract education, skills, experience, projects,
 certifications and achievements.
 
-For subscription policies extract service, price, billing,
-renewal, cancellation and restrictions.
+For subscription policies extract service, provider, plan,
+price, billing, renewal, cancellation, refunds and restrictions.
 
-For other documents identify the type and extract relevant facts.
+For other documents identify the actual type and extract
+the relevant facts.
 
 RULES:
 - Use English for extracted information.
 - Never treat a resume as a legal agreement.
 - Never invent amounts, dates, risks or penalties.
-- Keep sentences short.
+- Keep sentences short and factual.
 - Leave irrelevant categories empty.
 - Leave tamil_summary empty.
 - Use strings in arrays, never nested objects.
@@ -685,18 +689,57 @@ DOCUMENT TEXT:
     started = time.perf_counter()
 
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            result = json.loads(response.read().decode("utf-8"))
 
-        content = result.get("message", {}).get("content", "")
+        with urllib.request.urlopen(
+            request,
+            timeout=TIMEOUT
+        ) as response:
+
+            result = json.loads(
+                response.read().decode("utf-8")
+            )
+
+        content = result.get(
+            "message", {}
+        ).get("content", "")
 
         print("\n--- OLLAMA PERFORMANCE ---")
-        print(f"Request time: {time.perf_counter() - started:.2f} seconds")
+        print(
+            f"Request time: "
+            f"{time.perf_counter() - started:.2f} seconds"
+        )
         print("Done reason:", result.get("done_reason"))
         print("Generated tokens:", result.get("eval_count", 0))
+
+        if result.get("eval_duration"):
+
+            generation_seconds = (
+                result["eval_duration"] / 1_000_000_000
+            )
+
+            print(
+                f"Generation time: {generation_seconds:.2f} seconds"
+            )
+
         print("--- END PERFORMANCE ---\n")
 
-        analysis = json.loads(content)
+        if not content.strip():
+            raise RuntimeError("Ollama returned an empty response.")
+
+        try:
+            analysis = json.loads(content)
+
+        except json.JSONDecodeError as error:
+
+            print("\n--- INVALID OLLAMA RESPONSE ---")
+            print(content[:2000])
+            print("Done reason:", result.get("done_reason"))
+            print("--- END RESPONSE ---\n")
+
+            raise RuntimeError(
+                "Ollama returned incomplete JSON. "
+                "Try a shorter document."
+            ) from error
 
         if not isinstance(analysis, dict):
             raise RuntimeError("Invalid AI response structure.")
@@ -704,24 +747,21 @@ DOCUMENT TEXT:
         return analysis
 
     except urllib.error.HTTPError as error:
+
         raise RuntimeError(
             f"Ollama HTTP error: {error.code}"
         ) from error
 
     except urllib.error.URLError as error:
+
         raise RuntimeError(
             "Cannot connect to Ollama. Check that Ollama is running."
         ) from error
 
     except TimeoutError as error:
+
         raise RuntimeError(
             "AI analysis timed out. Please try again."
-        ) from error
-
-    except json.JSONDecodeError as error:
-        print("Ollama response was incomplete.")
-        raise RuntimeError(
-            "The AI returned incomplete JSON. Try a shorter document."
         ) from error
 
 
@@ -745,7 +785,11 @@ def merge_analyses(results):
         "tamil_summary"
     ]
 
-    risk_order = {"Low": 1, "Medium": 2, "High": 3}
+    risk_order = {
+        "Low": 1,
+        "Medium": 2,
+        "High": 3
+    }
 
     for result in results:
 
@@ -761,41 +805,65 @@ def merge_analyses(results):
         risk = result.get("overall_risk", "Low")
 
         if risk in risk_order:
+
             if risk_order[risk] > risk_order[merged["overall_risk"]]:
                 merged["overall_risk"] = risk
 
         for field in list_fields:
-            values = result.get(field, [])
-            if isinstance(values, list):
-                add_unique(merged[field], [
-                    item for item in values if isinstance(item, str)
-                ])
 
-        extracted = result.get("extracted_information", {})
+            values = result.get(field, [])
+
+            if isinstance(values, list):
+
+                add_unique(
+                    merged[field],
+                    [
+                        item for item in values
+                        if isinstance(item, str)
+                    ]
+                )
+
+        extracted = result.get(
+            "extracted_information", {}
+        )
 
         if isinstance(extracted, dict):
+
             for field in INFORMATION_FIELDS:
+
                 values = extracted.get(field, [])
+
                 if isinstance(values, list):
+
                     add_unique(
                         merged["extracted_information"][field],
-                        [item for item in values if isinstance(item, str)]
+                        [
+                            item for item in values
+                            if isinstance(item, str)
+                        ]
                     )
 
     return merged
 
 
 # ==================================================
-# FALLBACK SUMMARIES
+# SUMMARY FALLBACK
 # ==================================================
 
 def create_summary_fallback(analysis):
 
-    document_type = str(analysis.get("document_type", "")).lower()
-    extracted = analysis.get("extracted_information", {})
+    document_type = str(
+        analysis.get("document_type", "")
+    ).lower()
+
+    extracted = analysis.get(
+        "extracted_information", {}
+    )
 
     if "resume" in document_type or "cv" in document_type:
+
         source = extracted
+
         categories = [
             ("Education", "education"),
             ("Skills", "skills"),
@@ -803,8 +871,11 @@ def create_summary_fallback(analysis):
             ("Projects", "projects"),
             ("Certifications", "certifications")
         ]
+
     else:
+
         source = analysis
+
         categories = [
             ("Financial details", "financial_obligations"),
             ("Important conditions", "key_conditions"),
@@ -815,40 +886,54 @@ def create_summary_fallback(analysis):
     summary = []
 
     for label, field in categories:
-        for value in source.get(field, [])[:2]:
-            if isinstance(value, str) and value.strip():
-                summary.append(f"{label}: {value}")
-            if len(summary) >= 3:
-                return summary
+
+        values = source.get(field, [])
+
+        if isinstance(values, list):
+
+            for value in values[:2]:
+
+                if isinstance(value, str) and value.strip():
+                    summary.append(f"{label}: {value}")
+
+                if len(summary) >= 3:
+                    return summary
 
     return summary
 
 
 def create_tamil_summary(analysis):
 
-    kind = str(analysis.get("document_type", "")).lower()
+    kind = str(
+        analysis.get("document_type", "")
+    ).lower()
 
     if "resume" in kind or "cv" in kind:
+
         return [
             "இந்த Resume-ல் கல்வி, திறன்கள், வேலை அனுபவம், திட்டங்கள் மற்றும் சான்றிதழ்கள் பற்றிய விவரங்கள் உள்ளன."
         ]
 
     if "rental" in kind:
+
         return [
             "இந்த வாடகை ஒப்பந்தத்தில் வாடகைத் தொகை, முன்பணம், ஒப்பந்த காலம் மற்றும் முக்கிய விதிமுறைகள் பற்றிய விவரங்கள் உள்ளன."
         ]
 
     if "internship" in kind:
+
         return [
             "இந்த இன்டர்ன்ஷிப் கடிதத்தில் நிறுவனத்தின் பெயர், பணிப்பதவி, உதவித்தொகை, பணிக்காலம் மற்றும் முக்கிய நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
         ]
 
     if "employment" in kind:
+
         return [
             "இந்த வேலைவாய்ப்பு கடிதத்தில் பணிப்பதவி, சம்பளம், வேலை காலம் மற்றும் முக்கிய நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
         ]
 
     if "subscription" in kind:
+
         return [
             "இந்த சந்தா ஆவணத்தில் கட்டணம், புதுப்பித்தல் மற்றும் ரத்து செய்வதற்கான விதிமுறைகள் குறிப்பிடப்பட்டுள்ளன."
         ]
@@ -873,31 +958,57 @@ def analyze_document(document_text, language="English"):
 
     kind = classify_document(document_text)
 
-    # Rental agreements use direct extraction.
+    # Rental agreement: direct extraction.
     if kind == "rental":
+
         analysis = analyze_rental_without_ai(document_text)
-        print(f"Total analysis time: {time.perf_counter() - started:.2f} seconds")
+
+        print(
+            f"Total analysis time: "
+            f"{time.perf_counter() - started:.2f} seconds"
+        )
+
         return analysis
 
-    # Internship and employment offers use direct extraction.
+    # Internship and employment: direct extraction.
     if kind in ["internship", "employment"]:
-        analysis = analyze_offer_without_ai(document_text, kind)
-        print(f"Total analysis time: {time.perf_counter() - started:.2f} seconds")
+
+        analysis = analyze_offer_without_ai(
+            document_text,
+            kind
+        )
+
+        print(
+            f"Total analysis time: "
+            f"{time.perf_counter() - started:.2f} seconds"
+        )
+
         return analysis
 
-    # Remaining document types use Ollama.
+    # Resume, subscription and other documents: Ollama.
     details = extract_document_details(document_text)
     chunks = split_text(document_text)
 
-    print(f"CLARIFY AI: {len(chunks)} section(s) to analyze.")
+    print(
+        f"CLARIFY AI: {len(chunks)} section(s) to analyze."
+    )
 
     results = []
 
     for index, chunk in enumerate(chunks, start=1):
-        print(f"CLARIFY AI: Analyzing section {index}/{len(chunks)}...")
-        results.append(analyze_chunk(chunk, language))
+
+        print(
+            f"CLARIFY AI: Analyzing section {index}/{len(chunks)}..."
+        )
+
+        results.append(
+            analyze_chunk(chunk, language)
+        )
 
     analysis = merge_analyses(results)
+
+    # Add contact details extracted directly.
+    extracted = analysis["extracted_information"]
 
     for field in [
         "emails",
@@ -906,16 +1017,18 @@ def analyze_document(document_text, language="English"):
         "amounts",
         "websites"
     ]:
-        add_unique(
-            analysis["extracted_information"][field],
-            details[field]
-        )
 
+        add_unique(extracted[field], details[field])
+
+    # Generate fallback summary if required.
     if not analysis.get("summary"):
+
         analysis["summary"] = create_summary_fallback(analysis)
 
+    # Use reliable Tamil explanation.
     analysis["tamil_summary"] = create_tamil_summary(analysis)
 
+    # Add coverage and disclaimer.
     analysis["analysis_coverage"] = {
         "sections_analyzed": len(chunks),
         "total_characters": len(document_text)
@@ -923,10 +1036,13 @@ def analyze_document(document_text, language="English"):
 
     analysis["disclaimer"] = (
         "CLARIFY AI extracts and explains information from your document. "
-        "Always verify important details against the original document."
+        "Always verify important information against the original document."
     )
 
     print("\nCLARIFY AI: Analysis completed successfully.")
-    print(f"Total analysis time: {time.perf_counter() - started:.2f} seconds")
+    print(
+        f"Total analysis time: "
+        f"{time.perf_counter() - started:.2f} seconds"
+    )
 
     return analysis
