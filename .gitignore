@@ -1,0 +1,24 @@
+# Python environment
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Private configuration
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Uploaded documents
+uploads/
+instance/
+
+# Build files
+dist/
+build/
+node_modules/
+
+# Editor files
+.vscode/
+.DS_Store

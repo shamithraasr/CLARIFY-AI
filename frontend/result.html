@@ -1,0 +1,119 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Details | CLARIFY AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="results-page">
+
+    <nav class="navbar">
+        <a href="/" class="logo">🔍 CLARIFY AI</a>
+
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard">New Document</a>
+        </div>
+    </nav>
+
+    <main class="results-container">
+
+        <section class="results-heading">
+            <span class="section-tag">SMART DOCUMENT READER</span>
+            <h1>Document <span>Insights</span></h1>
+            <p>Your document, understood in simple and clear points.</p>
+        </section>
+
+        <!-- Document Information -->
+        <section class="result-card summary-card">
+
+            <div class="result-card-heading">
+                <span>📄</span>
+                <h2 id="documentType">Analysed Document</h2>
+            </div>
+
+            <p id="documentSummary">
+                Important document information will appear here.
+            </p>
+
+        </section>
+
+        <!-- Personal and Contact Information -->
+        <section class="result-card">
+
+            <h2>👤 Personal & Contact Details</h2>
+
+            <div id="contactDetailsList" class="result-list">
+                <p>Extracted contact details will appear here.</p>
+            </div>
+
+        </section>
+
+        <!-- Main Extracted Information -->
+        <section class="result-card">
+
+            <h2>✨ Important Information</h2>
+
+            <p>Key details identified from your document.</p>
+
+            <div id="conditionsList" class="result-list">
+                <p>Important points will appear here.</p>
+            </div>
+
+        </section>
+
+        <!-- Complete Extracted Information -->
+        <section class="result-card">
+
+            <h2>📋 Complete Extracted Details</h2>
+
+            <div id="extractedInformationList" class="result-list">
+                <p>Extracted information will appear here.</p>
+            </div>
+
+        </section>
+
+        <!-- Tamil Explanation -->
+        <section class="result-card tamil-card">
+
+            <h2>🌐 Tamil Explanation</h2>
+
+            <div id="tamilSummary">
+                தமிழ் விளக்கம் இங்கே காண்பிக்கப்படும்.
+            </div>
+
+        </section>
+
+        <!-- Disclaimer -->
+        <section class="disclaimer-card">
+
+            <h3>About This Analysis</h3>
+
+            <p id="disclaimer">
+                CLARIFY AI extracts and explains information from your document.
+                Always verify important details against the original document.
+            </p>
+
+        </section>
+
+        <div class="results-actions">
+
+            <a href="/dashboard" class="primary-button">
+                Analyse Another Document →
+            </a>
+
+            <a href="/" class="secondary-button">
+                Back to Home
+            </a>
+
+        </div>
+
+    </main>
+
+    <script src="/js/result.js"></script>
+
+</body>
+</html>

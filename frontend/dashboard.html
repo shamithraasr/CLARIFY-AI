@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | CLARIFY AI</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="navbar">
+    <a href="/" class="logo">
+        <span class="logo-icon">C</span>
+        CLARIFY <span class="logo-ai">AI</span>
+    </a>
+    <nav>
+        <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/#about">About</a>
+    </nav>
+    <a href="/" class="nav-button">← Back Home</a>
+</header>
+
+<main class="dashboard-page">
+    <section class="dashboard-heading">
+        <span class="eyebrow">YOUR DOCUMENT INTELLIGENCE SPACE</span>
+        <h1>Welcome to <span>CLARIFY AI.</span></h1>
+        <p>Upload your document. Understand every important detail.</p>
+    </section>
+
+    <section class="dashboard-layout">
+
+        <div class="upload-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Analyse a Document</h2>
+                    <p>Upload a PDF or paste your document text.</p>
+                </div>
+                <span class="panel-icon">📄</span>
+            </div>
+
+            <form id="analysisForm">
+
+                <label class="input-label">Upload PDF Document</label>
+
+                <label for="documentFile" class="upload-area" id="uploadArea">
+                    <div class="upload-icon">↑</div>
+                    <h3>Drop your PDF here</h3>
+                    <p>or <span>browse files</span> from your computer</p>
+                    <small>PDF files only · Maximum size 10 MB</small>
+                    <input type="file" id="documentFile" accept=".pdf,application/pdf" hidden>
+                </label>
+
+                <p id="fileName" class="file-name"></p>
+
+                <div class="divider-text"><span>OR</span></div>
+
+                <label for="documentText" class="input-label">
+                    Paste Document Text
+                </label>
+
+                <textarea
+                    id="documentText"
+                    placeholder="Paste your agreement, offer letter, policy or other document text here..."
+                    rows="7"
+                ></textarea>
+
+                <div class="language-row">
+                    <label for="language" class="input-label">
+                        Explanation Language
+                    </label>
+
+                    <select id="language">
+                        <option value="English">English</option>
+                        <option value="Tamil">தமிழ் (Tamil)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="primary-button analyse-button" id="analyseButton">
+                    Analyse My Document →
+                </button>
+
+                <p id="statusMessage" class="status-message"></p>
+
+                <p class="privacy-note">
+                    🔒 Your uploaded PDF is processed for analysis and temporary files are removed after processing.
+                </p>
+
+            </form>
+        </div>
+
+        <aside class="dashboard-sidebar">
+
+            <div class="info-card">
+                <span class="sidebar-icon">🤖</span>
+                <h3>Smart AI Analysis</h3>
+                <p>Understand complex language through AI-powered document analysis.</p>
+            </div>
+
+            <div class="info-card">
+                <span class="sidebar-icon">⚠️</span>
+                <h3>Hidden Risk Detection</h3>
+                <p>Identify important conditions, possible risks and penalties.</p>
+            </div>
+
+            <div class="info-card">
+                <span class="sidebar-icon">🌐</span>
+                <h3>Two Languages</h3>
+                <p>Understand your document in English or Tamil.</p>
+            </div>
+
+            <div class="tip-card">
+                <h3>💡 Quick Tip</h3>
+                <p>Always review payment terms, cancellation policies, deadlines and penalties before signing a document.</p>
+            </div>
+
+        </aside>
+    </section>
+</main>
+
+<footer>
+    <a href="/" class="logo">CLARIFY <span class="logo-ai">AI</span></a>
+    <p>Understand Before You Sign.</p>
+    <small>© 2026 CLARIFY AI. All rights reserved.</small>
+</footer>
+
+<script src="/js/script.js"></script>
+</body>
+</html>
