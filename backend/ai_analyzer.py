@@ -23,7 +23,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 MODEL_NAME = os.getenv(
     "GROQ_MODEL",
-    "llama-3.3-70b-versatile"
+    "openai/gpt-oss-120b"
 )
 
 if not GROQ_API_KEY:
@@ -437,160 +437,6 @@ def analyze_rental_without_ai(text):
 
 
 # ==================================================
-# DIRECT INTERNSHIP / EMPLOYMENT ANALYSIS
-# ==================================================
-
-def analyze_offer_without_ai(text, document_kind):
-
-    print("CLARIFY AI: Offer letter detected.")
-    print("CLARIFY AI: Using direct extraction.")
-
-    result = empty_result()
-    details = result["extracted_information"]
-
-    details.update(extract_document_details(text))
-
-    recipient = get_label_value(text, "To")
-    company = get_label_value(text, "Company")
-    position = get_label_value(text, "Position")
-    duration = get_label_value(text, "Duration")
-    joining_date = get_label_value(text, "Joining Date")
-    stipend = get_label_value(text, "Monthly Stipend")
-    salary = get_label_value(text, "Salary")
-    hr_email = get_label_value(text, "HR Email")
-    website = get_label_value(text, "Company Website")
-
-    if not position:
-
-        match = re.search(
-            r"position as\s+(.+?)\s+at\s+(.+?)[.,\n]",
-            text,
-            re.IGNORECASE
-        )
-
-        if match:
-            position = match.group(1).strip()
-            company = company or match.group(2).strip()
-
-    if recipient:
-        details["names"].append(recipient)
-
-    if company:
-        details["other_details"].append("Company: " + company)
-
-    if position:
-        details["experience"].append(position)
-
-    if hr_email:
-        add_unique(details["emails"], [hr_email])
-
-    if website:
-        add_unique(details["websites"], [website])
-
-    responsibilities = matching_sentences(
-        text,
-        [
-            "develop and test",
-            "assist the development",
-            "progress reports",
-            "team meetings"
-        ],
-        maximum=4
-    )
-
-    conditions = matching_sentences(
-        text,
-        [
-            "confidentiality",
-            "weekly progress",
-            "completion certificate",
-            "written notice",
-            "terminate"
-        ],
-        maximum=4
-    )
-
-    financial = []
-
-    if stipend:
-        financial.append("Monthly stipend: " + stipend)
-    elif salary:
-        financial.append("Salary: " + salary)
-
-    summary = []
-
-    if position:
-        summary.append("Position: " + position)
-
-    if company:
-        summary.append("Company: " + company)
-
-    if duration:
-        summary.append("Duration: " + duration)
-
-    if stipend:
-        summary.append("Monthly stipend: " + stipend)
-
-    if joining_date:
-        summary.append("Joining date: " + joining_date)
-
-    important = []
-    add_unique(important, responsibilities)
-    add_unique(important, conditions)
-
-    deadlines = []
-
-    if joining_date:
-        deadlines.append("Joining date: " + joining_date)
-
-    if duration:
-        deadlines.append("Internship duration: " + duration)
-
-    notice = matching_sentences(
-        text,
-        [
-            "days' written notice",
-            "days written notice",
-            "notice before ending"
-        ]
-    )
-
-    add_unique(deadlines, notice)
-
-    result["document_type"] = (
-        "Internship Offer Letter"
-        if document_kind == "internship"
-        else "Employment Offer Letter"
-    )
-
-    result["summary"] = summary[:3]
-    result["important_points"] = important[:3]
-    result["financial_obligations"] = financial
-    result["deadlines"] = deadlines[:4]
-    result["key_conditions"] = conditions[:4]
-    result["checklist"] = responsibilities[:2]
-
-    if document_kind == "internship":
-
-        result["tamil_summary"] = [
-            "இந்த இன்டர்ன்ஷிப் வாய்ப்பு கடிதத்தில் நிறுவனத்தின் பெயர், பணிப்பதவி, உதவித்தொகை, பணிக்காலம் மற்றும் முக்கிய நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
-        ]
-
-    else:
-
-        result["tamil_summary"] = [
-            "இந்த வேலைவாய்ப்பு கடிதத்தில் நிறுவனத்தின் பெயர், பணிப்பதவி, சம்பளம் மற்றும் வேலை நிபந்தனைகள் குறிப்பிடப்பட்டுள்ளன."
-        ]
-
-    result["analysis_coverage"] = {
-        "sections_analyzed": 1,
-        "total_characters": len(text)
-    }
-
-    return result
-
-
-# ==================================================
 # DOCUMENT CHUNKING
 # ==================================================
 
@@ -636,35 +482,102 @@ def split_text(text):
 # AI ANALYSIS USING GROQ
 # ==================================================
 
-def analyze_chunk(chunk, language):
+def analyze_chunk(chunk, language, document_kind="other"):
+
+    document_instructions = ""
+
+    if document_kind in ["internship", "employment"]:
+
+        document_instructions = """
+This is an INTERNSHIP or EMPLOYMENT OFFER LETTER.
+
+Carefully analyse the complete offer letter.
+
+Identify:
+1. Company name and offered job position.
+2. Internship or employment duration.
+3. Joining date and working days.
+4. Daily working hours and weekly workload.
+5. Monthly stipend, salary and payment conditions.
+6. Any registration fee, training fee, security fee or deposit.
+7. Whether any fee is refundable or non-refundable.
+8. Conditions for receiving certificates or salary.
+9. Early termination and resignation conditions.
+10. Notice period required before leaving.
+11. Conditions allowing the company to withhold payment.
+12. Confidentiality and intellectual property obligations.
+13. Changes the company can make to duties, timings or responsibilities.
+14. Any missing or unclear terms.
+
+RISK DETECTION:
+- Identify upfront payments or training fees as financial risks.
+- Identify conditions that allow salary or stipend to be withheld.
+- Identify unusually restrictive termination conditions.
+- Identify long notice periods and unclear payment conditions.
+- Identify certificate conditions that depend on completing the full period.
+- Identify unclear working hours or changes to responsibilities.
+- Explain why a condition may deserve attention.
+- Do not automatically call a condition fraudulent or illegal.
+- Do not invent any condition that is not in the document.
+
+Put important conditions in key_conditions.
+Put fees, salary and stipend in financial_obligations.
+Put notice periods, joining dates and response deadlines in deadlines.
+Put withholding, forfeiture and other consequences in penalties.
+Put practical verification steps in checklist.
+Set overall_risk based on the actual conditions in the document.
+"""
+
+    elif document_kind == "subscription":
+
+        document_instructions = """
+This is a subscription document.
+Identify subscription charges, billing frequency, auto-renewal,
+cancellation, refunds, restrictions and penalties.
+"""
+
+    elif document_kind == "resume":
+
+        document_instructions = """
+This is a resume.
+Extract education, skills, experience, projects,
+certifications and achievements.
+Do not analyse it as a legal agreement.
+"""
+
+    else:
+
+        document_instructions = """
+Identify the actual document type and extract its important facts,
+conditions, financial obligations, deadlines and possible risks.
+"""
 
     prompt = f"""
-You are CLARIFY AI, an accurate document reader.
+You are CLARIFY AI, an accurate document understanding
+and hidden-condition detection assistant.
 
-Extract facts from the document. Never invent information.
+{document_instructions}
 
-For resumes extract education, skills, experience, projects,
-certifications and achievements.
+GENERAL RULES:
 
-For subscription policies extract service, provider, plan,
-price, billing, renewal, cancellation, refunds and restrictions.
-
-For other documents identify the actual type and extract
-the relevant facts.
-
-RULES:
+- Extract only information supported by the document.
+- Never invent information.
+- Explain complicated conditions in simple English.
+- Identify important conditions that a reader might overlook.
+- Keep extracted information factual.
+- Do not make unsupported legal conclusions.
+- Do not treat every condition as a risk.
 - Use English for extracted information.
-- Never treat a resume as a legal agreement.
-- Never invent amounts, dates, risks or penalties.
-- Keep sentences short and factual.
-- Leave irrelevant categories empty.
 - Leave tamil_summary empty.
+- Leave irrelevant categories empty.
+- Keep sentences short and clear.
 - Use strings in arrays, never nested objects.
 - Return only valid JSON matching this structure:
 
 {json.dumps(RESPONSE_SCHEMA, ensure_ascii=False)}
 
 DOCUMENT TEXT:
+
 {chunk}
 """
 
@@ -907,7 +820,7 @@ def analyze_document(document_text, language="English"):
 
     kind = classify_document(document_text)
 
-    # Rental agreement: direct extraction.
+    # Rental agreements retain direct extraction.
     if kind == "rental":
 
         analysis = analyze_rental_without_ai(document_text)
@@ -919,24 +832,15 @@ def analyze_document(document_text, language="English"):
 
         return analysis
 
-    # Internship and employment: direct extraction.
-    if kind in ["internship", "employment"]:
+    # Internship, employment, resume, subscription
+    # and other documents go through Groq AI.
 
-        analysis = analyze_offer_without_ai(
-            document_text,
-            kind
-        )
-
-        print(
-            f"Total analysis time: "
-            f"{time.perf_counter() - started:.2f} seconds"
-        )
-
-        return analysis
-
-    # Resume, subscription and other documents: Groq.
     details = extract_document_details(document_text)
     chunks = split_text(document_text)
+
+    print(
+        f"CLARIFY AI: Document type: {kind}"
+    )
 
     print(
         f"CLARIFY AI: {len(chunks)} section(s) to analyze."
@@ -951,12 +855,37 @@ def analyze_document(document_text, language="English"):
         )
 
         results.append(
-            analyze_chunk(chunk, language)
+            analyze_chunk(
+                chunk,
+                language,
+                kind
+            )
         )
 
     analysis = merge_analyses(results)
 
-    # Add contact details extracted directly.
+    # Set a clear document type when the AI response
+    # does not provide one.
+
+    if analysis["document_type"] == "Unknown":
+
+        if kind == "internship":
+            analysis["document_type"] = "Internship Offer Letter"
+
+        elif kind == "employment":
+            analysis["document_type"] = "Employment Offer Letter"
+
+        elif kind == "resume":
+            analysis["document_type"] = "Resume"
+
+        elif kind == "subscription":
+            analysis["document_type"] = "Subscription Policy"
+
+        else:
+            analysis["document_type"] = "Other Document"
+
+    # Add directly extracted contact information.
+
     extracted = analysis["extracted_information"]
 
     for field in [
@@ -970,14 +899,17 @@ def analyze_document(document_text, language="English"):
         add_unique(extracted[field], details[field])
 
     # Generate fallback summary if required.
+
     if not analysis.get("summary"):
 
         analysis["summary"] = create_summary_fallback(analysis)
 
     # Use reliable Tamil explanation.
+
     analysis["tamil_summary"] = create_tamil_summary(analysis)
 
     # Add coverage and disclaimer.
+
     analysis["analysis_coverage"] = {
         "sections_analyzed": len(chunks),
         "total_characters": len(document_text)
@@ -989,6 +921,7 @@ def analyze_document(document_text, language="English"):
     )
 
     print("\nCLARIFY AI: Analysis completed successfully.")
+
     print(
         f"Total analysis time: "
         f"{time.perf_counter() - started:.2f} seconds"
